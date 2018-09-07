@@ -6,6 +6,7 @@ from django.db.transaction import atomic
 from iso4217 import Currency
 
 import csv
+import requests
 
 from exchanger_api.models import (
     CH_ORDER_STATE,
@@ -56,6 +57,17 @@ class Command(BaseCommand):
     args = 'url to file.csv or path'
     help = 'patch to current database'
 
+    @staticmethod
+    def patch_db(source):
+        for row in source:
+            o = Order(*row)
+            merchant, s = Merchant.objects.get_or_create(pk=o.merchant_id)
+            if s:
+                merchant.save()
+            opts = {k: v for k, v in vars(o).items() if '__' not in k}
+            order, s = Order.objects.update_or_create(**opts)
+            if s:
+                order.save()
 
     def add_arguments(self, parser):
         parser.add_argument('--path', type=str)
@@ -65,19 +77,16 @@ class Command(BaseCommand):
             _path = options.get('path')
             _newline = options.get('newline') or '\n'
 
-            with open(_path, newline=_newline) as f:
-                f.readline()
-
-                spam_reader = csv.reader(f, )
-                try:
-                    for row in spam_reader:
-                        o = Order(*row)
-                        merchant, s = Merchant.objects.get_or_create(pk=o.merchant_id)
-                        if s:
-                            merchant.save()
-                        opts = {k: v for k, v in vars(o).items() if '__' not in k}
-                        order, s = Order.objects.update_or_create(**opts)
-                        if s:
-                            order.save()
-                except DatabaseError as ex:
-                    raise CommandError(f"Rollback...\n{ex}")
+            try:
+                if _path.startswith('http://') or \
+                        _path.startswith('https://'):
+                    f = requests.get(_path)
+                    spam_reader = csv.reader(f, )
+                    self.patch_db(spam_reader)
+                    return
+                with open(_path, newline=_newline) as f:
+                    f.readline()
+                    spam_reader = csv.reader(f, )
+                    self.patch_db(spam_reader)
+            except DatabaseError as ex:
+                raise CommandError(f"Rollback...\n{ex}")
