@@ -1,10 +1,17 @@
 from dataclasses import dataclass, field, asdict
 from datetime import datetime
+from django.core.management.base import BaseCommand, CommandError
+from django.db import DatabaseError
+from django.db.transaction import atomic
 from iso4217 import Currency
+
+import csv
 
 from exchanger_api.models import (
     CH_ORDER_STATE,
     CH_ORDER_TYPES,
+    Merchant,
+    Order,
 )
 
 
@@ -45,3 +52,32 @@ class Order:
         )
 
 
+class Command(BaseCommand):
+    args = 'url to file.csv or path'
+    help = 'patch to current database'
+
+
+    def add_arguments(self, parser):
+        parser.add_argument('--path', type=str)
+        parser.add_argument('newline', nargs='?', type=str)
+
+        def handle(self, *args, **options):
+            _path = options.get('path')
+            _newline = options.get('newline') or '\n'
+
+        with open(_path, newline=_newline) as f:
+            f.readline()
+
+            spam_reader = csv.reader(f, )
+            try:
+                for row in spam_reader:
+                    o = Order(*row)
+                    merchant, s = Merchant.objects.get_or_create(pk=o.merchant_id)
+                    if s:
+                        merchant.save()
+                    opts = {k: v for k, v in vars(o).items() if '__' not in k}
+                    order, s = Order.objects.update_or_create(**opts)
+                    if s:
+                        order.save()
+            except DatabaseError as ex:
+                raise CommandError(f"Rollback...\n{ex}")
