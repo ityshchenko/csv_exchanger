@@ -7,7 +7,7 @@ from iso4217 import Currency
 from rest_framework.filters import OrderingFilter, SearchFilter
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.serializers import (
-    Field,
+    ReadOnlyField,
     HyperlinkedModelSerializer,
     SerializerMethodField,
     Serializer,
@@ -29,7 +29,7 @@ class StandardResultsSetPagination(PageNumberPagination):
 
 
 class MerchantSerializer(Serializer):
-    id = Field(source='pk_id')
+    id = ReadOnlyField(source='pk_id')
 
     class Meta:
         model = Merchant
