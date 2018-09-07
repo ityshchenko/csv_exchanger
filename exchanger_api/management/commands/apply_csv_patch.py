@@ -65,19 +65,19 @@ class Command(BaseCommand):
             _path = options.get('path')
             _newline = options.get('newline') or '\n'
 
-        with open(_path, newline=_newline) as f:
-            f.readline()
+            with open(_path, newline=_newline) as f:
+                f.readline()
 
-            spam_reader = csv.reader(f, )
-            try:
-                for row in spam_reader:
-                    o = Order(*row)
-                    merchant, s = Merchant.objects.get_or_create(pk=o.merchant_id)
-                    if s:
-                        merchant.save()
-                    opts = {k: v for k, v in vars(o).items() if '__' not in k}
-                    order, s = Order.objects.update_or_create(**opts)
-                    if s:
-                        order.save()
-            except DatabaseError as ex:
-                raise CommandError(f"Rollback...\n{ex}")
+                spam_reader = csv.reader(f, )
+                try:
+                    for row in spam_reader:
+                        o = Order(*row)
+                        merchant, s = Merchant.objects.get_or_create(pk=o.merchant_id)
+                        if s:
+                            merchant.save()
+                        opts = {k: v for k, v in vars(o).items() if '__' not in k}
+                        order, s = Order.objects.update_or_create(**opts)
+                        if s:
+                            order.save()
+                except DatabaseError as ex:
+                    raise CommandError(f"Rollback...\n{ex}")
