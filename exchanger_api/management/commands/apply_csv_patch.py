@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field, asdict
 from datetime import datetime
 from django.core.management.base import BaseCommand, CommandError
+from django.core.exceptions import ObjectDoesNotExist
 from django.db import DatabaseError
 from django.db.transaction import atomic
 from iso4217 import Currency
@@ -18,7 +19,7 @@ from exchanger_api.models import (
 
 # Order is important
 @dataclass
-class Order:
+class OrderType:
     pk_id: int
     __creation_time: str
     merchant_id: int
@@ -60,33 +61,48 @@ class Command(BaseCommand):
     @staticmethod
     def patch_db(source):
         for row in source:
-            o = Order(*row)
+            o = OrderType(*row)
             merchant, s = Merchant.objects.get_or_create(pk=o.merchant_id)
             if s:
                 merchant.save()
             opts = {k: v for k, v in vars(o).items() if '__' not in k}
-            order, s = Order.objects.update_or_create(**opts)
-            if s:
-                order.save()
+            try:
+                order = Order.objects.get(pk_id=o.pk_id)
+                for k, v in opts.items():
+                    setattr(order, k, v)
+            except ObjectDoesNotExist:
+                order = Order(**opts)
+            order.save()
 
     def add_arguments(self, parser):
         parser.add_argument('--path', type=str)
         parser.add_argument('newline', nargs='?', type=str)
 
-        def handle(self, *args, **options):
-            _path = options.get('path')
-            _newline = options.get('newline') or '\n'
+    def handle(self, *args, **options):
+        _path = options.get('path')
+        _newline = options.get('newline') or '\n'
 
-            try:
-                if _path.startswith('http://') or \
-                        _path.startswith('https://'):
-                    f = requests.get(_path)
-                    spam_reader = csv.reader(f, )
+        if not _path:
+            raise CommandError('Path is required.\n\nEnter path or url to csv-file.')
+
+        try:
+            if _path.startswith('http://') or \
+                    _path.startswith('https://'):
+                r = requests.get(_path)
+                if not r.status_code == 200:
+                    raise CommandError('Source error\n\nCheck source')
+                f = r.content.decode('utf-8').splitlines()[1:]
+                spam_reader = csv.reader(f, )
+
+                with atomic():
                     self.patch_db(spam_reader)
-                    return
-                with open(_path, newline=_newline) as f:
-                    f.readline()
-                    spam_reader = csv.reader(f, )
+
+                return
+            with open(_path, newline=_newline) as f:
+                f.readline()
+                spam_reader = csv.reader(f, )
+
+                with atomic():
                     self.patch_db(spam_reader)
-            except DatabaseError as ex:
-                raise CommandError(f"Rollback...\n{ex}")
+        except DatabaseError as ex:
+            raise CommandError(f"Rollback...\n{ex}")
