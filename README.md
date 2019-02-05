@@ -1,5 +1,10 @@
 # Test task for Fondy.eu
 
+Server must provide API for transaction log and method to update data from csv.
+Test data:
+  - [initial](https://gist.github.com/TihonV/bd5b2a963519a468ba9882b93b9c8ad6)
+  - [patch](https://gist.github.com/TihonV/cb486255e19cd3546613a9ea07d1ae8d)
+
 ### Env
 
 Use [pipenv](https://github.com/pypa/pipenv) or virtualenv
